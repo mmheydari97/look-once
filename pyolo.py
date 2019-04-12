@@ -7,8 +7,7 @@ import cv2
 
 # construct the argument parse
 ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--image",
-                help="path to the input image")
+ap.add_argument("-i", "--image", help="path to the input image")
 ap.add_argument("-y", "--yolo", default="yolo-coco",
                 help="base path to YOLO directory")
 ap.add_argument("-c", "--confidence", type=float, default=0.5,
@@ -36,18 +35,37 @@ configPath = os.path.sep.join([args["yolo"], "yolov3.cfg"])
 print("[INFO] loading YOLO from disk...")
 net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
 
-# load our input image and grab its spatial dimensions
-image = cv2.imread(args["image"])
 
 CONF = args["confidence"]
 THRESH = args["threshold"]
 
-if image is not None:
-    (H, W) = image.shape[:2]
+# determine only the *output* layer names that we need from YOLO
+ln = net.getLayerNames()
+ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
-    # determine only the *output* layer names that we need from YOLO
-    ln = net.getLayerNames()
-    ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+(H, W) = (None, None)
+STREAM = True
+image = None
+cap = None
+
+if args["image"]:
+    # load our input image and grab its spatial dimensions
+    image = cv2.imread(args["image"])
+
+else:
+    cap = cv2.VideoCapture(0)
+    print("[INFO] using webcam")
+
+while STREAM:
+
+    if not args["image"]:
+        (grabbed, image) = cap.read()
+
+        if not grabbed:
+            break
+
+    if W is None or H is None:
+        (H, W) = image.shape[:2]
 
     # construct a blob from the input image and then perform a forward
     # pass of the YOLO object detector, giving us our bounding boxes and
@@ -58,9 +76,6 @@ if image is not None:
     start = time.time()
     layerOutputs = net.forward(ln)
     end = time.time()
-
-    # show timing information on YOLO
-    print("[INFO] YOLO took {:.6f} seconds".format(end - start))
 
     # initialize our lists of detected bounding boxes, confidences, and
     # class IDs, respectively
@@ -99,8 +114,7 @@ if image is not None:
                 confidences.append(float(confidence))
                 classIDs.append(classID)
 
-    # apply non-maxima suppression to suppress weak, overlapping bounding
-    # boxes
+    # apply non-maxima suppression to suppress weak, overlapping bounding boxes
     idxs = cv2.dnn.NMSBoxes(boxes, confidences, CONF, THRESH)
 
     # ensure at least one detection exists
@@ -120,5 +134,22 @@ if image is not None:
 
     # show the output image
     cv2.imshow("Image", image)
-    cv2.waitKey(0)
 
+    if args["image"]:
+
+        file_name = str(args["image"]).split("/")[-1]
+        file_path = os.path.join(os.curdir, "output", file_name)
+        cv2.imwrite(file_path, image)
+
+        # show timing information on YOLO
+        print("[INFO] YOLO took {:.6f} seconds".format(end - start))
+
+        STREAM = False
+
+    # Press Esc in webcam mode to exit
+    if cv2.waitKey(1) == 27:
+        break
+
+if cap is not None:
+    cap.release()
+cv2.destroyAllWindows()
