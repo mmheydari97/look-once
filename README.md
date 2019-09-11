@@ -25,3 +25,6 @@ The main idea is from a tutorial by **Adrian Rosebrock** and I got to know that 
 
 You can also download the weights from this [link](https://pjreddie.com/media/files/yolov3.weights).
 
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details
